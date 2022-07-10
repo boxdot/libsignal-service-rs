@@ -608,6 +608,22 @@ pub trait PushService: MaybeSend {
         )
         .await
     }
+    async fn retrieve_versioned_profile_by_id(
+        &mut self,
+        id: &str,
+        version: &ProfileKeyVersion,
+    ) -> Result<SignalServiceProfile, ServiceError> {
+        // Bincode is transparent and will return a hex-encoded string.
+        let version = bincode::serialize(version)?;
+        let version = std::str::from_utf8(&version)
+            .expect("profile_key_version is hex encoded string");
+        self.get_json(
+            Endpoint::Service,
+            &format!("/v1/profile/{}/{}", id, version),
+            HttpAuthOverride::NoOverride,
+        )
+        .await
+    }
 
     async fn get_pre_key(
         &mut self,

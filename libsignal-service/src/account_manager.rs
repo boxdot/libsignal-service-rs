@@ -310,10 +310,15 @@ impl<Service: PushService> AccountManager<Service> {
             self.profile_key.expect("set profile key in AccountManager");
         let profile_key = ProfileKey::create(profile_key);
         let profile_cipher = ProfileCipher::from(profile_key);
+        let profile_key_version =
+            profile_key.get_profile_key_version(*uuid.as_bytes());
 
         let encrypted_profile = self
             .service
-            .retrieve_profile_by_id(&uuid.to_string())
+            .retrieve_versioned_profile_by_id(
+                &uuid.to_string(),
+                &profile_key_version,
+            )
             .await?;
 
         // Profile decryption
