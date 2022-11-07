@@ -2,13 +2,14 @@ use std::convert::TryFrom;
 
 use block_modes::block_padding::{Iso7816, Padding};
 use libsignal_protocol::{
-    message_decrypt_prekey, message_decrypt_signal, message_encrypt,
-    sealed_sender_decrypt, sealed_sender_encrypt, CiphertextMessageType,
-    DeviceId, IdentityKeyStore, PreKeySignalMessage, PreKeyStore,
-    ProtocolAddress, PublicKey, SealedSenderDecryptionResult,
-    SenderCertificate, SessionStore, SignalMessage, SignalProtocolError,
-    SignedPreKeyStore,
+    group_decrypt, message_decrypt_prekey, message_decrypt_signal,
+    message_encrypt, sealed_sender_decrypt, sealed_sender_decrypt_to_usmc,
+    sealed_sender_encrypt, CiphertextMessageType, DeviceId, IdentityKeyStore,
+    PreKeySignalMessage, PreKeyStore, ProtocolAddress, PublicKey,
+    SealedSenderDecryptionResult, SenderCertificate, SenderKeyStore,
+    SessionStore, SignalMessage, SignalProtocolError, SignedPreKeyStore,
 };
+use log::info;
 use prost::Message;
 use rand::{CryptoRng, Rng};
 use uuid::Uuid;
@@ -25,23 +26,25 @@ use crate::{
 ///
 /// Equivalent of SignalServiceCipher in Java.
 #[derive(Clone)]
-pub struct ServiceCipher<S, I, SP, P, R> {
+pub struct ServiceCipher<S, I, SP, P, SK, R> {
     session_store: S,
     identity_key_store: I,
     signed_pre_key_store: SP,
     pre_key_store: P,
+    sender_key_store: SK,
     csprng: R,
     trust_root: PublicKey,
     local_uuid: Uuid,
     local_device_id: u32,
 }
 
-impl<S, I, SP, P, R> ServiceCipher<S, I, SP, P, R>
+impl<S, I, SP, P, SK, R> ServiceCipher<S, I, SP, P, SK, R>
 where
     S: SessionStore + Clone,
     I: IdentityKeyStore + Clone,
     SP: SignedPreKeyStore + Clone,
     P: PreKeyStore + Clone,
+    SK: SenderKeyStore + Clone,
     R: Rng + CryptoRng + Clone,
 {
     #[allow(clippy::too_many_arguments)]
@@ -50,6 +53,7 @@ where
         identity_key_store: I,
         signed_pre_key_store: SP,
         pre_key_store: P,
+        sender_key_store: SK,
         csprng: R,
         trust_root: PublicKey,
         local_uuid: Uuid,
@@ -60,6 +64,7 @@ where
             identity_key_store,
             signed_pre_key_store,
             pre_key_store,
+            sender_key_store,
             csprng,
             trust_root,
             local_uuid,
@@ -191,38 +196,90 @@ where
                 Plaintext { metadata, data }
             },
             Type::UnidentifiedSender => {
-                let SealedSenderDecryptionResult {
-                    sender_uuid,
-                    sender_e164,
-                    device_id,
-                    mut message,
-                } = sealed_sender_decrypt(
+                let message_content = sealed_sender_decrypt_to_usmc(
                     ciphertext,
-                    &self.trust_root,
-                    envelope.timestamp(),
-                    None,
-                    self.local_uuid.to_string(),
-                    self.local_device_id.into(),
                     &mut self.identity_key_store,
-                    &mut self.session_store,
-                    &mut self.pre_key_store,
-                    &mut self.signed_pre_key_store,
                     None,
                 )
                 .await?;
 
-                let sender = ServiceAddress {
-                    phonenumber: sender_e164
-                        .and_then(|n| phonenumber::parse(None, n).ok()),
-                    uuid: Some(Uuid::parse_str(&sender_uuid).map_err(
-                        |_| {
-                            SignalProtocolError::InvalidSealedSenderMessage(
-                                "invalid sender UUID".to_string(),
-                            )
-                        },
-                    )?),
-                    relay: None,
-                };
+                let (sender, device_id, mut message) =
+                    if let CiphertextMessageType::SenderKey =
+                        message_content.msg_type()?
+                    {
+                        let ciphertext = message_content.contents()?;
+                        let certificate = message_content.sender()?;
+
+                        let sender_uuid = certificate.sender_uuid()?;
+                        let device_id = certificate.sender_device_id()?;
+
+                        let sender = ProtocolAddress::new(
+                            sender_uuid.to_string(),
+                            device_id,
+                        );
+
+                        let message = group_decrypt(
+                            ciphertext,
+                            &mut self.sender_key_store,
+                            &sender,
+                            None,
+                        )
+                        .await?;
+
+                        let sender = ServiceAddress {
+                            phonenumber: None,
+                            uuid: Some(Uuid::parse_str(&sender_uuid).map_err(
+                                |_| {
+                                    SignalProtocolError::InvalidSealedSenderMessage(
+                                        "invalid sender UUID".to_string(),
+                                    )
+                                },
+                            )?),
+                            relay: None,
+                        };
+
+                        let content = crate::proto::Content::decode(&*message);
+                        info!(
+                            "### decrypted sender key message: sender = {sender:?}, device_id = {device_id:?}, content = {content:?}",
+                        );
+
+                        (sender, device_id, message)
+                    } else {
+                        let SealedSenderDecryptionResult {
+                            sender_uuid,
+                            sender_e164,
+                            device_id,
+                            message,
+                        } = sealed_sender_decrypt(
+                            ciphertext,
+                            &self.trust_root,
+                            envelope.timestamp(),
+                            None,
+                            self.local_uuid.to_string(),
+                            self.local_device_id.into(),
+                            &mut self.identity_key_store,
+                            &mut self.session_store,
+                            &mut self.pre_key_store,
+                            &mut self.signed_pre_key_store,
+                            None,
+                        )
+                        .await?;
+
+                        let sender = ServiceAddress {
+                            phonenumber: sender_e164
+                                .and_then(|n| phonenumber::parse(None, n).ok()),
+                            uuid: Some(Uuid::parse_str(&sender_uuid).map_err(
+                                |_| {
+                                    SignalProtocolError::InvalidSealedSenderMessage(
+                                        "invalid sender UUID".to_string(),
+                                    )
+                                },
+                            )?),
+                            relay: None,
+                        };
+
+                        (sender, device_id, message)
+                    };
 
                 let metadata = Metadata {
                     sender,

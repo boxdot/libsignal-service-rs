@@ -52,6 +52,8 @@ impl Content {
             Some(Self::from_body(msg, metadata))
         } else if let Some(msg) = p.typing_message {
             Some(Self::from_body(msg, metadata))
+        } else if let Some(msg) = p.sender_key_distribution_message {
+            Some(Self::from_body(msg, metadata))
         } else {
             None
         }
@@ -66,6 +68,7 @@ pub enum ContentBody {
     CallMessage(CallMessage),
     ReceiptMessage(ReceiptMessage),
     TypingMessage(TypingMessage),
+    SenderKeyDistibutionMessage(Vec<u8>),
 }
 
 impl ContentBody {
@@ -91,6 +94,10 @@ impl ContentBody {
                 typing_message: Some(msg),
                 ..Default::default()
             },
+            Self::SenderKeyDistibutionMessage(msg) => crate::proto::Content {
+                sender_key_distribution_message: Some(msg),
+                ..Default::default()
+            },
         }
     }
 }
@@ -110,3 +117,4 @@ impl_from_for_content_body!(SynchronizeMessage(SyncMessage));
 impl_from_for_content_body!(CallMessage(CallMessage));
 impl_from_for_content_body!(ReceiptMessage(ReceiptMessage));
 impl_from_for_content_body!(TypingMessage(TypingMessage));
+impl_from_for_content_body!(SenderKeyDistibutionMessage(Vec<u8>));
