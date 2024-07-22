@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["AttachmentUploadError",""],["MessageSenderError",""]],"struct":[["AttachmentSpec","Attachment specification to be used for uploading."],["MessageSender","Equivalent of Java's `SignalServiceMessageSender`."],["OutgoingPushMessage",""],["OutgoingPushMessages",""],["SendMessageResponse",""],["SendMessageResult",""]]});
+window.SIDEBAR_ITEMS = {"enum":["AttachmentUploadError","MessageSenderError"],"struct":["AttachmentSpec","MessageSender","OutgoingPushMessage","OutgoingPushMessages","SendMessageResponse","SentMessage"],"type":["SendMessageResult"]};

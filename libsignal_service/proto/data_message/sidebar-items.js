@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Flags",""],["ProtocolVersion",""]],"mod":[["body_range","Nested message and enum types in `BodyRange`."],["contact","Nested message and enum types in `Contact`."],["quote","Nested message and enum types in `Quote`."]],"struct":[["BodyRange",""],["Contact",""],["Delete",""],["Preview",""],["Quote",""],["Reaction",""],["Sticker",""]]});
+window.SIDEBAR_ITEMS = {"enum":["Flags","ProtocolVersion"],"mod":["contact","payment","quote"],"struct":["Contact","Delete","GiftBadge","GroupCallUpdate","Payment","Quote","Reaction","Sticker","StoryContext"]};

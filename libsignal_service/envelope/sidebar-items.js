@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["EnvelopeParseError",""]],"struct":[["EnvelopeEntity",""]]});
+window.SIDEBAR_ITEMS = {"struct":["EnvelopeEntity"]};
