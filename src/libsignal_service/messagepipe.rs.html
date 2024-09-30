@@ -148,9 +148,6 @@
 <a href="#148" id="148">148</a>
 <a href="#149" id="149">149</a>
 <a href="#150" id="150">150</a>
-<a href="#151" id="151">151</a>
-<a href="#152" id="152">152</a>
-<a href="#153" id="153">153</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>bytes::Bytes;
 <span class="kw">use </span>futures::{
     channel::{
@@ -291,10 +288,7 @@
 <span class="doccomment">/// WebSocketService that panics on every request, mainly for example code.
 </span><span class="kw">pub struct </span>PanicingWebSocketService;
 
-<span class="attr">#[allow(
-    clippy::diverging_sub_expression,
-    reason = <span class="string">"combination of async_trait and todo"
-</span>)]
+<span class="attr">#[allow(clippy::diverging_sub_expression)]
 #[cfg_attr(feature = <span class="string">"unsend-futures"</span>, async_trait::async_trait(<span class="question-mark">?</span>Send))]
 #[cfg_attr(not(feature = <span class="string">"unsend-futures"</span>), async_trait::async_trait)]
 </span><span class="kw">impl </span>WebSocketService <span class="kw">for </span>PanicingWebSocketService {
